@@ -5,6 +5,7 @@ import Grid from "./components/Grid";
 type Cell = { char: string | null; updatedBy?: string };
 
 const SERVER = import.meta.env.VITE_SERVER_URL || "http://localhost:4000";
+// const SERVER = "https://multiplayer-grid-backend.vercel.app/";
 
 export default function App() {
   const [socket, setSocket] = useState<Socket | null>(null);

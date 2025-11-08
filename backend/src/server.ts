@@ -1,9 +1,10 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import http from "http";
-import { Server } from "socket.io";
+import { Server, Socket } from "socket.io";
 import cors from "cors";
 
 type Cell = { char: string | null; updatedBy?: string; timestamp?: number };
+
 type UpdateEvent = {
   row: number;
   col: number;
@@ -12,12 +13,22 @@ type UpdateEvent = {
   timestamp: number;
 };
 
+type UpdatePayload = {
+  row: number;
+  col: number;
+  char: string;
+};
+
 const app = express();
 app.use(cors());
+app.use(express.json());
+
 const server = http.createServer(app);
+
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "*", // Replace with your frontend URL in production for safety
+    methods: ["GET", "POST"],
   },
 });
 
@@ -35,22 +46,22 @@ let history: UpdateEvent[] = [];
 // Track which sockets (players) have submitted
 const submitted: Set<string> = new Set();
 
+// Track active players
+const activePlayers: Set<string> = new Set();
+
 function getGridState() {
   return grid.map((row) =>
     row.map((cell) => ({ char: cell.char, updatedBy: cell.updatedBy }))
   );
 }
 
-// REST endpoint: optional, get history
-app.get("/history", (req, res) => {
+// REST endpoint: get history
+app.get("/history", (req: Request, res: Response) => {
   res.json(history);
 });
 
 // Socket.io handlers
-// Maintain a set of active sockets
-const activePlayers = new Set<string>();
-
-io.on("connection", (socket) => {
+io.on("connection", (socket: Socket) => {
   console.log("connect:", socket.id);
   activePlayers.add(socket.id);
 
@@ -61,12 +72,13 @@ io.on("connection", (socket) => {
     youId: socket.id,
   });
 
-  // Broadcast updated player count to everyone
+  // Broadcast updated player count
   io.emit("online-count", { count: activePlayers.size });
 
-  socket.on("update-cell", (payload) => {
+  socket.on("update-cell", (payload: UpdatePayload) => {
     const { row, col, char } = payload;
 
+    // Validation checks
     if (submitted.has(socket.id)) {
       socket.emit("error-msg", { message: "You already submitted!" });
       return;
@@ -92,7 +104,7 @@ io.on("connection", (socket) => {
   });
 });
 
-// Listen
+// Start server
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
